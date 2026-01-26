@@ -569,16 +569,23 @@ class TungPainter extends CustomPainter {
     // --- 2. Draw Yarn (Layers) ---
     if (layers <= 0) return;
 
-    final yarnPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = layers > 25 ? 2.0 : 4.0 // Thinner lines if many layers
-      ..strokeJoin = StrokeJoin.round;
-      
+    // Calculate Spacing FIRST
     double startRadius = stickThickness * 0.8; 
     double layerSpacing = (maxRadius - startRadius) / layers;
 
-    // Grouping: Change color every 3 layers (optional, looks more authentic)
-    // or change every single layer. Let's do every 2 layers for a nice pattern.
+    // KEY FIX: Set thickness to 85% of the spacing
+    // This forces a 15% empty gap between every single line
+    double yarnThickness = layerSpacing * 0.85;
+    
+    // Safety clamp: Don't let it get thinner than 1 pixel or thicker than 8 pixels
+    yarnThickness = yarnThickness.clamp(1.0, 8.0);
+
+    final yarnPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = yarnThickness 
+      ..strokeJoin = StrokeJoin.round;
+      
+    // Change color every 2 layers
     int colorChangeFrequency = 2; 
 
     for (int i = 1; i <= layers; i++) {
