@@ -91,7 +91,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
       final double rVal = double.parse(_rController.text);
       final double xVal = double.parse(_xController.text);
       
-      // Constraint: s = x
+      // Constraint from user request: s = x
       final double sVal = xVal; 
 
       if (xVal <= 0) {
@@ -107,82 +107,91 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
       StringBuffer log = StringBuffer();
       log.writeln("--- ข้อมูลนำเข้า (Inputs) ---");
       log.writeln("C (ความยาวไม้โครง) = $cVal cm");
-      log.writeln("r (รัศมีแกนกลาง)    = $rVal cm");
+      log.writeln("r (รัศมีแกนกลาง)     = $rVal cm");
       log.writeln("x (ความหนาไหมพรม) = $xVal cm");
-      log.writeln("s (ระยะห่าง = x)    = $sVal cm");
+      log.writeln("s (กำหนดให้ s=x)    = $sVal cm");
       log.writeln("");
 
-      // --- 3. Calculate n (จำนวนชั้น) ---
-      log.writeln("--- ขั้นตอนที่ 1: หาจำนวนชั้น (n) ---");
-      // Formula: n = floor( [ (C-2r)/2 - s ] / x )
+      // --- 3. Calculate M and n ---
+      log.writeln("--- ขั้นตอนที่ 1: หาค่า M และ จำนวนชั้น (n) ---");
       
+      // Formula M: M = ((C - 2r) / 2) - x
       double halfLength = (cVal - (2 * rVal)) / 2;
-      log.writeln("1. หาความยาวด้านเดียว (หักแกนกลาง):");
-      log.writeln("   (C - 2r)/2 = ($cVal - ${2*rVal})/2 = $halfLength cm");
+      double mVal = halfLength - xVal;
       
-      double remainingSpace = halfLength - sVal;
-      log.writeln("2. หักระยะเริ่มต้น (s): $halfLength - $sVal = $remainingSpace");
+      log.writeln("สูตร M = ((C - 2r) / 2) - x");
+      log.writeln("   M = ($cVal - ${2*rVal})/2 - $xVal");
+      log.writeln("   M = $halfLength - $xVal = ${mVal.toStringAsFixed(4)}");
+
+      // Formula n: n = floor( [ ((C-2r)/2) - s ] / x )
+      // Since s = x, the numerator is exactly M.
+      // So n = M / x
       
-      double division = remainingSpace / xVal;
-      log.writeln("3. หารด้วยความหนาไหมพรม (x):");
-      log.writeln("   $remainingSpace / $xVal = ${division.toStringAsFixed(4)}");
-      
+      double division = mVal / xVal;
       int n = division.floor();
       if (n < 0) n = 0; // Safety
-      log.writeln("4. ปัดเศษลงเป็นจำนวนเต็ม:");
+
+      log.writeln("สูตร n = floor( [((C-2r)/2) - s] / x )");
+      log.writeln("เนื่องจาก s = x, ดังนั้นตัวเศษคือค่า M");
+      log.writeln("   n = floor($mVal / $xVal)");
+      log.writeln("   n = floor(${division.toStringAsFixed(4)})");
       log.writeln("   n = $n ชั้น");
       log.writeln("");
 
-      // --- 4. Calculate Summation (L) ---
-      log.writeln("--- ขั้นตอนที่ 2: คำนวณความยาวไหมพรม ---");
+      // --- 4. Calculate Summation (L_total) ---
+      log.writeln("--- ขั้นตอนที่ 2: คำนวณผลรวม (Sigma) ---");
+      log.writeln("ใช้สูตร: 3√2(M + (i-1)x) + √((M+(i-1)x)² + (M+ix)²)");
+      
       double summation = 0;
 
       for (int i = 1; i <= n; i++) {
-        // Term A: 3√2 * (s + (i-1)x)
-        double termAInner = sVal + (i - 1) * xVal;
-        double termA = 3 * sqrt(2) * termAInner;
+        // Variable Terms based on index i
+        double termBase = mVal + (i - 1) * xVal;     // (M + (i-1)x)
+        double termNext = mVal + i * xVal;           // (M + ix)
 
-        // Term B: sqrt( (s + (i-1)x)^2 + (s + ix)^2 )
-        double part1Inner = sVal + (i - 1) * xVal;
-        double part2Inner = sVal + i * xVal;
-        
-        double part1Sq = pow(part1Inner, 2).toDouble();
-        double part2Sq = pow(part2Inner, 2).toDouble();
-        double termB = sqrt(part1Sq + part2Sq);
+        // Part 1: 3 * sqrt(2) * (M + (i-1)x)
+        double part1 = 3 * sqrt(2) * termBase;
 
-        double iterationTotal = termA + termB;
+        // Part 2: sqrt( (M + (i-1)x)^2 + (M + ix)^2 )
+        double sq1 = pow(termBase, 2).toDouble();
+        double sq2 = pow(termNext, 2).toDouble();
+        double part2 = sqrt(sq1 + sq2);
+
+        double iterationTotal = part1 + part2;
         summation += iterationTotal;
 
         // Log detailed steps for first 3 and last iteration only
         if (i <= 3 || i == n) {
-          log.writeln("ชั้นที่ $i:");
-          log.writeln("   ความยาวส่วนโครง = ${termA.toStringAsFixed(3)}");
-          log.writeln("   ความยาวส่วนทแยง = ${termB.toStringAsFixed(3)}");
-          log.writeln("   รวมชั้นนี้ = ${iterationTotal.toStringAsFixed(3)}");
+          log.writeln("i=$i:");
+          log.writeln("   TermBase (M+(i-1)x) = ${termBase.toStringAsFixed(3)}");
+          log.writeln("   Part1 (3√2...) = ${part1.toStringAsFixed(3)}");
+          log.writeln("   Part2 (√(sq+sq)) = ${part2.toStringAsFixed(3)}");
+          log.writeln("   รวมรอบนี้ = ${iterationTotal.toStringAsFixed(3)}");
         } else if (i == 4 && n > 5) {
-          log.writeln("... (ละการแสดงผลชั้นกลางๆ เพื่อความกระชับ) ...");
+          log.writeln("... (ละการแสดงผลชั้นกลางๆ) ...");
         }
       }
-      log.writeln("ผลรวมความยาวทุกชั้น = ${summation.toStringAsFixed(4)} cm");
+      log.writeln("ผลรวม Sigma = ${summation.toStringAsFixed(4)} cm");
       log.writeln("");
 
       // --- 5. Calculate Constant Part ---
-      log.writeln("--- ขั้นตอนที่ 3: ส่วนประกอบเพิ่มเติม ---");
+      log.writeln("--- ขั้นตอนที่ 3: ส่วนค่าคงที่ ---");
       // Formula: (4n + 1) * [ 2 * pi * (r + x/2) ]
+      
       double multiplier = (4.0 * n) + 1.0;
       double radiusTerm = rVal + (xVal / 2);
-      double bracketContent = 2 * pi * radiusTerm;
-      double constantPart = multiplier * bracketContent;
+      double circumference = 2 * pi * radiusTerm;
+      double constantPart = multiplier * circumference;
 
       log.writeln("ตัวคูณ (4n+1) = $multiplier");
-      log.writeln("เส้นรอบวง (2π(r + x/2)) = ${bracketContent.toStringAsFixed(4)}");
+      log.writeln("เทอมวงกลม 2π(r + x/2) = ${circumference.toStringAsFixed(4)}");
       log.writeln("ค่าคงที่รวม = ${constantPart.toStringAsFixed(4)} cm");
       log.writeln("");
 
       // --- 6. Final Result ---
       double lTotal = summation + constantPart;
-      log.writeln("--- สรุปผลการคำนวณ ---");
-      log.writeln("L = ผลรวมทุกชั้น + ค่าคงที่");
+      log.writeln("--- สรุปผลการคำนวณ L_total ---");
+      log.writeln("L = ผลรวม Sigma + ค่าคงที่");
       log.writeln("L = $summation + $constantPart");
       log.writeln("L = $lTotal cm");
 
@@ -256,8 +265,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
           // --- INPUT CARD ---
           Card(
             elevation: 4,
-            // UPDATED: Fixed deprecation
-            shadowColor: Colors.indigo.withValues(alpha: 0.3),
+            shadowColor: Colors.indigo.withOpacity(0.3),
             surfaceTintColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
@@ -277,6 +285,14 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
                   _buildTextField("r : รัศมีของไม้โครง (แกนกลาง)", _rController),
                   const SizedBox(height: 15),
                   _buildTextField("x : ความหนาของเส้นไหมพรม", _xController),
+                  const SizedBox(height: 10),
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                      SizedBox(width: 5),
+                      Text("หมายเหตุ: คำนวณโดยใช้เงื่อนไข s = x", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  )
                 ],
               ),
             ),
@@ -322,7 +338,6 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
           if (_currentResult != null) ...[
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 15),
-              // UPDATED: Fixed 'Colors.indigoDark' error
               child: Align(alignment: Alignment.centerLeft, child: Text("ผลลัพธ์ล่าสุด:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.indigo))),
             ),
             _buildResultSummaryCard(_currentResult!, true),
@@ -387,8 +402,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
   Widget _buildResultSummaryCard(CalculationRecord record, bool isHighlight) {
     return Card(
       elevation: isHighlight ? 8 : 2,
-      // UPDATED: Fixed deprecation
-      shadowColor: isHighlight ? Colors.indigoAccent.withValues(alpha: 0.4) : Colors.black12,
+      shadowColor: isHighlight ? Colors.indigoAccent.withOpacity(0.4) : Colors.black12,
       color: isHighlight ? Colors.white : Colors.grey[50],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: isHighlight ? const BorderSide(color: Colors.indigoAccent, width: 1.5) : BorderSide.none),
       child: ExpansionTile(
@@ -444,8 +458,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with SingleTickerProvid
         ),
         trailing: Container(
           padding: const EdgeInsets.all(6),
-          // UPDATED: Fixed deprecation
-          decoration: BoxDecoration(color: Colors.indigo.withValues(alpha: 0.1), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.1), shape: BoxShape.circle),
           child: const Icon(Icons.keyboard_arrow_down, color: Colors.indigo)
         ),
         children: [
@@ -506,8 +519,7 @@ class TungVisualization extends StatelessWidget {
         color: const Color(0xFFF0F0F0), 
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          // UPDATED: Fixed deprecation
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: ClipRRect(
